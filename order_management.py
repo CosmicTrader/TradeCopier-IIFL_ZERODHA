@@ -14,6 +14,7 @@ from db_utils import save_parent_account_order
 file_handler = logging.FileHandler(filename='error.log', mode='a', encoding='utf-8')
 logging.basicConfig(handlers=[file_handler], level=logging.WARNING, format='%(asctime)s %(levelname)s %(message)s')
 
+# Please make sure to update following file regularly
 max_qty_df = pd.read_excel('qtyfreeze.xls', index_col=0)
 max_qty_df.rename(columns = {col : col.strip() for col in max_qty_df.columns}, inplace = True)
 max_qty_df.SYMBOL = max_qty_df.SYMBOL.str.strip()
@@ -80,8 +81,8 @@ def handle_new_order(order) :
             print('Please Ensure that account is added in order_multiplier_mapper dictionary')
             order_multiplier = 1
 
-        number_of_lot = round(int(order['OrderQuantity']) * order_multiplier / lot_size)
-        totalQuantity = number_of_lot * int(order['OrderQuantity'])
+        number_of_lot = int(int(order['OrderQuantity']) / lot_size * order_multiplier)
+        totalQuantity = number_of_lot * lot_size
         _orders = []
 
         while totalQuantity > 0:
@@ -114,8 +115,8 @@ def handle_new_order(order) :
             print('Please Ensure that account is added in order_multiplier_mapper dictionary')
             order_multiplier = 1
         
-        number_of_lot = round(int(order['OrderQuantity']) * order_multiplier / lot_size)
-        totalQuantity = number_of_lot * int(order['OrderQuantity'])
+        number_of_lot = int(int(order['OrderQuantity']) / lot_size * order_multiplier)
+        totalQuantity = number_of_lot * lot_size
         _orders = []
         while totalQuantity > 0:
             if totalQuantity > symbol_max_qty:
@@ -151,7 +152,6 @@ def handle_modified_order(order) :
 
     for user_api in iifl_accounts :
         try:
-            
             try:
                 order_multiplier = order_multiplier_mapper[user_api]
             except Exception as e:
@@ -159,10 +159,10 @@ def handle_modified_order(order) :
                 order_multiplier = 1
         
             for iiflOrderID in parent_child_account_order_mapper [str(order['AppOrderID'])] [account_name_mapper[user_api]] :
-                number_of_lot = round(int(order['OrderQuantity']) * order_multiplier / lot_size)
+                number_of_lot = round(int(order['OrderQuantity'])  / lot_size * order_multiplier)
+                orderQuantity = number_of_lot * lot_size
 
-                if number_of_lot > 0:
-                    orderQuantity = number_of_lot * int(order['OrderQuantity'])
+                if orderQuantity > 0:
                     modified_iifl_order = iifl_modify_order(iapi = user_api, appOrderID = iiflOrderID, modifiedProductType = order['ProductType'], modifiedOrderType = order['OrderType'],
                                     modifiedOrderQuantity = orderQuantity, modifiedDisclosedQuantity = 0, modifiedTimeInForce = order['TimeInForce'], 
                                     modifiedLimitPrice = order['OrderPrice'], modifiedStopPrice = order['OrderStopPrice'], orderUniqueIdentifier = order['AppOrderID']
@@ -179,12 +179,17 @@ def handle_modified_order(order) :
 
     for user_api in zerodha_accounts :
         try:
-            for kiteOrderID in parent_child_account_order_mapper [str(order['AppOrderID'])] [account_name_mapper[user_api]] :
-                number_of_lot = round(int(order['OrderQuantity']) * order_multiplier_mapper[user_api] / lot_size)
-                
-                if number_of_lot > 0 :
-                    orderQuantity = number_of_lot * int(order['OrderQuantity'])
+            try:
+                order_multiplier = order_multiplier_mapper[user_api]
+            except Exception as e:
+                print('Please Ensure that account is added in order_multiplier_mapper dictionary')
+                order_multiplier = 1
 
+            for kiteOrderID in parent_child_account_order_mapper [str(order['AppOrderID'])] [account_name_mapper[user_api]] :
+                number_of_lot = round(int(order['OrderQuantity'])  / lot_size * order_multiplier)
+                orderQuantity = number_of_lot * lot_size
+                
+                if orderQuantity > 0 :
                     modified_kite_order = error_handler(kite_modify_order, zapi= user_api, variety = 'regular', order_id = kiteOrderID, quantity = orderQuantity, price = order['OrderPrice'], 
                                         order_type = kite_variable_mapper [order['OrderType']], trigger_price = order['OrderStopPrice'], 
                                         validity = 'DAY', disclosed_quantity = 0)
